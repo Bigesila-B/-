@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>硅基流动专用 - 大模型API聊天工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Inter", system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #f7f8fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部配置栏 */
+        .config-bar {
+            padding: 12px 16px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .config-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .config-group label {
+            font-size: 14px;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .config-input {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            flex: 1;
+            outline: none;
+        }
+
+        .config-input:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66,133,244,0.1);
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .primary-btn {
+            background: #4285f4;
+            color: #fff;
+        }
+
+        .primary-btn:hover {background: #3367d6;}
+        .primary-btn:active {transform: scale(0.96);}
+
+        .default-btn {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .default-btn:hover {background: #eee;}
+
+        /* 聊天内容区 */
+        .chat-container {
+            flex: 1;
+            padding: 20px 16px;
+            overflow-y: auto;
+            max-height: calc(100vh - 180px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .chat-container::-webkit-scrollbar {width: 4px;}
+        .chat-container::-webkit-scrollbar-thumb {background: #ddd; border-radius: 2px;}
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+
+        .user-message {
+            background: #4285f4;
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .assistant-message {
+            background: #fff;
+            color: #333;
+            align-self: flex-start;
+            border: 1px solid #eee;
+            border-bottom-left-radius: 4px;
+        }
+
+        .typing {
+            align-self: flex-start;
+            color: #666;
+            font-size: 14px;
+            padding: 8px 16px;
+        }
+
+        .empty-tip {
+            margin: auto;
+            color: #999;
+            font-size: 15px;
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        /* 输入区 */
+        .input-area {
+            padding: 16px;
+            background: #fff;
+            border-top: 1px solid #eee;
+        }
+
+        .input-wrap {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 14px 16px;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 15px;
+            outline: none;
+            resize: none;
+            min-height: 48px;
+            max-height: 120px;
+        }
+
+        #user-input:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66,133,244,0.1);
+        }
+
+        #send-btn {
+            padding: 14px 24px;
+            white-space: nowrap;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 768px) {
+            .config-bar {flex-direction: column; align-items: stretch;}
+            .message {max-width: 95%;}
+            #send-btn {padding: 14px 18px;}
+        }
+    </style>
+</head>
+<body>
+    <!-- API配置栏 -->
+    <div class="config-bar">
+        <div class="config-group">
+            <label>API地址：</label>
+            <input type="text" class="config-input" id="api-base" placeholder="硅基流动默认：https://api.siliconflow.cn/v1">
+        </div>
+        <div class="config-group">
+            <label>API密钥：</label>
+            <input type="password" class="config-input" id="api-key" placeholder="sk-xxx... 硅基流动密钥">
+        </div>
+        <div class="config-group">
+            <label>模型：</label>
+            <input type="text" class="config-input" id="model" placeholder="例：Qwen/Qwen2.5-72B-Instruct">
+        </div>
+        <button class="btn default-btn" id="clear-chat">清空对话</button>
+    </div>
+
+    <!-- 聊天内容区 -->
+    <div class="chat-container" id="chat-container">
+        <div class="empty-tip">配置硅基流动API后，即可开始聊天 ?</div>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="input-area">
+        <div class="input-wrap">
+            <textarea id="user-input" placeholder="输入你的问题，回车发送，Shift+Enter换行..."></textarea>
+            <button class="btn primary-btn" id="send-btn">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // 核心DOM元素
+        const apiBase = document.getElementById('api-base');
+        const apiKey = document.getElementById('api-key');
+        const model = document.getElementById('model');
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const clearChatBtn = document.getElementById('clear-chat');
+
+        // 本地存储KEY定义（统一管理）
+        const STORAGE_KEYS = {
+            chatHistory: 'llmChatHistory',
+            apiConfig: 'llmApiConfig' // 存储API地址、密钥、模型
+        }
+
+        // 初始化数据：对话历史+API配置 都本地保存
+        let chatHistory = JSON.parse(localStorage.getItem(STORAGE_KEYS.chatHistory) || '[]');
+        let apiConfig = JSON.parse(localStorage.getItem(STORAGE_KEYS.apiConfig) || '{"apiBase":"https://api.siliconflow.cn/v1","apiKey":"","model":""}');
+        // 加载状态锁，防止重复请求
+        let isLoading = false;
+
+        // 1. 从本地存储加载API配置到输入框（核心新增）
+        function loadApiConfig() {
+            apiBase.value = apiConfig.apiBase || 'https://api.siliconflow.cn/v1';
+            apiKey.value = apiConfig.apiKey || '';
+            model.value = apiConfig.model || '';
+        }
+
+        // 2. 保存API配置到本地存储（核心新增：输入时自动保存）
+        function saveApiConfig() {
+            apiConfig = {
+                apiBase: apiBase.value.trim(),
+                apiKey: apiKey.value.trim(),
+                model: model.value.trim()
+            };
+            localStorage.setItem(STORAGE_KEYS.apiConfig, JSON.stringify(apiConfig));
+        }
+
+        // 3. 渲染对话历史
+        function renderChat() {
+            if (chatHistory.length === 0) {
+                chatContainer.innerHTML = '<div class="empty-tip">配置硅基流动API后，即可开始聊天 ?</div>';
+                return;
+            }
+            
+            chatContainer.innerHTML = '';
+            chatHistory.forEach(msg => {
+                const msgEl = document.createElement('div');
+                msgEl.className = `message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`;
+                msgEl.textContent = msg.content;
+                chatContainer.appendChild(msgEl);
+            });
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 4. 保存对话到本地存储
+        function saveChat() {
+            localStorage.setItem(STORAGE_KEYS.chatHistory, JSON.stringify(chatHistory));
+        }
+
+        // 5. 添加消息到对话（渲染+保存）
+        function addMessage(role, content) {
+            chatHistory.push({role, content});
+            saveChat();
+            renderChat();
+        }
+
+        // 6. 显示打字中状态
+        function showTyping() {
+            const typingEl = document.createElement('div');
+            typingEl.className = 'typing';
+            typingEl.textContent = '思考中...';
+            chatContainer.appendChild(typingEl);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // 7. 移除打字中状态
+        function hideTyping() {
+            const typingEl = document.querySelector('.typing');
+            if (typingEl) typingEl.remove();
+        }
+
+        // 8. 核心：调用硅基流动大模型API
+        async function callLLM(prompt) {
+            // 先保存最新API配置（防止用户修改后未保存）
+            saveApiConfig();
+            // 校验配置
+            const baseUrl = apiConfig.apiBase;
+            const key = apiConfig.apiKey;
+            const modelName = apiConfig.model;
+            if (!baseUrl || !key || !modelName) {
+                alert('请完整填写API地址、密钥和模型名称！硅基流动模型名需从模型广场复制');
+                return;
+            }
+            if (isLoading) return;
+
+            // 添加用户消息
+            addMessage('user', prompt);
+            userInput.value = '';
+            isLoading = true;
+            showTyping();
+
+            try {
+                // 构造API请求体（兼容OpenAI格式，硅基流动直接用）
+                const response = await fetch(`${baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${key}`
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: chatHistory, // 携带上下文
+                        temperature: 0.7,
+                        stream: false
+                    }),
+                    timeout: 30000 // 30秒超时
+                });
+
+                if (!response.ok) throw new Error(`请求失败：${response.status}，请检查密钥有效性和模型名是否正确`);
+                const resData = await response.json();
+                const assistantReply = resData.choices[0].message.content.trim();
+                
+                hideTyping();
+                addMessage('assistant', assistantReply);
+            } catch (error) {
+                hideTyping();
+                alert(`请求失败：${error.message}`);
+                console.error('错误详情：', error);
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        // 9. 清空对话
+        function clearChat() {
+            chatHistory = [];
+            saveChat();
+            renderChat();
+        }
+
+        // 10. 绑定事件（新增API输入框实时保存）
+        function bindEvents() {
+            // API配置项输入时自动保存（核心新增）
+            apiBase.addEventListener('input', saveApiConfig);
+            apiKey.addEventListener('input', saveApiConfig);
+            model.addEventListener('input', saveApiConfig);
+
+            // 发送按钮点击
+            sendBtn.addEventListener('click', () => {
+                const prompt = userInput.value.trim();
+                if (prompt) callLLM(prompt);
+            });
+
+            // 回车发送（Shift+Enter换行）
+            userInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const prompt = userInput.value.trim();
+                    if (prompt) callLLM(prompt);
+                }
+            });
+
+            // 清空对话
+            clearChatBtn.addEventListener('click', clearChat);
+        }
+
+        // 初始化：先加载配置→渲染对话→绑定事件
+        function init() {
+            loadApiConfig(); // 加载本地保存的API配置
+            renderChat();
+            bindEvents();
+            userInput.focus();
+        }
+
+        init();
+    </script>
+</body>
+</html>
